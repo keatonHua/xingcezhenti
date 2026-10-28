@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""Split national civil-service exam 'administrative law' papers into year/type folders.
+"""Split the national civil-service administrative-law exam files by year and module.
 
-Structure created:
+The repo contains raw markdown files like:
+  01-政治理论/2025年国家公务员录用考试《行测》题（行政执法卷网友回忆版）.md
+
+This script copies them into the reorganized layout:
   国家公务员录用考试《行测》题（行政执法卷）/
-    {year}/
-      {module}/
+    2025/
+      01-政治理论/
         题目.md
         答案.md
-
-The script reads the existing raw markdown files already in the repo and writes split files
-without modifying the original files.
 """
 
 from __future__ import annotations
@@ -18,15 +18,7 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-TARGET_ROOT = ROOT / "国家公务员录用考试《行测》题（行政执法卷）》"
-
-# Use a stable literal path name that matches the directory created in the repo.
 TARGET_ROOT = ROOT / "国家公务员录用考试《行测》题（行政执法卷）"
-
-SOURCE_PATTERNS = [
-    "*国家公务员录用考试《行测》题（行政执法卷网友回忆版）*.md",
-    "*国家公务员录用考试《行测》题（行政执法卷）*.md",
-]
 
 
 def split_question_and_answer(content: str):
@@ -41,14 +33,18 @@ def main():
     TARGET_ROOT.mkdir(parents=True, exist_ok=True)
 
     source_files = []
-    for pattern in SOURCE_PATTERNS:
-        source_files.extend(ROOT.glob(f"**/{pattern}"))
+    for path in ROOT.rglob("*.md"):
+        name = path.name
+        if "国家公务员录用考试《行测》题" in name and "行政执法卷" in name:
+            source_files.append(path)
 
     seen = set()
+    processed = 0
     for file_path in sorted(source_files):
-        if file_path in seen:
+        key = str(file_path)
+        if key in seen:
             continue
-        seen.add(file_path)
+        seen.add(key)
 
         year_match = re.search(r"(\d{4})年", file_path.name)
         if not year_match:
@@ -61,37 +57,37 @@ def main():
 
         text = file_path.read_text(encoding="utf-8")
         question_text, answer_text = split_question_and_answer(text)
-
-        question_path = out_dir / "题目.md"
-        answer_path = out_dir / "答案.md"
+        rel_path = file_path.relative_to(ROOT)
 
         question_content = (
             "---\n"
             "类型: \"题目\"\n"
             f"年份: \"{year}\"\n"
             f"题型: \"{module_name}\"\n"
-            f"来源: \"{file_path.relative_to(ROOT)}\"\n"
+            f"来源: \"{rel_path}\"\n"
             "---\n\n"
             f"# {year} 年国家公务员录用考试《行测》题（行政执法卷）\n\n"
             "## 题目\n\n"
             f"{question_text}\n"
         )
+
         answer_content = (
             "---\n"
             "类型: \"答案\"\n"
             f"年份: \"{year}\"\n"
             f"题型: \"{module_name}\"\n"
-            f"来源: \"{file_path.relative_to(ROOT)}\"\n"
+            f"来源: \"{rel_path}\"\n"
             "---\n\n"
             f"# {year} 年国家公务员录用考试《行测》题（行政执法卷）\n\n"
             "## 答案\n\n"
             f"{answer_text}\n"
         )
 
-        question_path.write_text(question_content, encoding="utf-8")
-        answer_path.write_text(answer_content, encoding="utf-8")
+        (out_dir / "题目.md").write_text(question_content, encoding="utf-8")
+        (out_dir / "答案.md").write_text(answer_content, encoding="utf-8")
+        processed += 1
 
-    print(f"整理完成：共处理 {len(seen)} 份原始题文件，输出目录：{TARGET_ROOT}")
+    print(f"整理完成：共处理 {processed} 份原始题文件，输出目录：{TARGET_ROOT}")
 
 
 if __name__ == "__main__":
